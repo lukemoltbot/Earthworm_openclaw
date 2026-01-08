@@ -1,0 +1,232 @@
+{
+  "lithology_qualifiers": {
+    "CO": {
+      "description": "Coal",
+      "qualifiers": {
+        "BR": "bright (>90%)",
+        "BB": "bright with dull bands (60-90%)",
+        "BD": "interbanded dull and bright bands (40-60%)",
+        "DB": "mainly dull with frequent bright bands (10-40%)",
+        "DM": "dull with minor bright bands (1-10%)",
+        "DD": "dull (<1%)",
+        "AN": "anthracite",
+        "CI": "cindered",
+        "KC": "coked",
+        "CT": "cannel (torbanite, bog)",
+        "DC": "dull conchoidal",
+        "FU": "fusainous",
+        "HA": "heat affected",
+        "IF": "inferior",
+        "SP": "sapropelic",
+        "SY": "stony",
+        "CU": "undifferentiated"
+      }
+    },
+    "ZS": {
+      "description": "Coaly Sandstone",
+      "qualifiers": {
+        "FF": "fine grained",
+        "FM": "fine to medium grained",
+        "FC": "fine to coarse grained",
+        "MM": "medium grained",
+        "MC": "medium to coarse grained",
+        "CC": "coarse grained"
+      }
+    },
+    "XS": {
+      "description": "Carbonaceous Sandstone",
+      "qualifiers": {
+        "FF": "fine grained",
+        "FM": "fine to medium grained",
+        "FC": "fine to coarse grained",
+        "MM": "medium grained",
+        "MC": "medium to coarse grained",
+        "CC": "coarse grained"
+      }
+    },
+    "CL": {
+      "description": "Clay",
+      "qualifiers": {
+        "SI": "silty",
+        "SA": "sandy",
+        "GV": "gravelly"
+      }
+    },
+    "SI": {
+      "description": "Silt",
+      "qualifiers": {
+        "CL": "clayey",
+        "SA": "sandy",
+        "GV": "gravelly"
+      }
+    },
+    "SA": {
+      "description": "Sand",
+      "qualifiers": {
+        "CL": "clayey",
+        "SI": "silty",
+        "GV": "gravelly",
+        "FF": "fine grained",
+        "FM": "fine to medium grained",
+        "FC": "fine to coarse grained",
+        "MM": "medium grained",
+        "MC": "medium to coarse grained",
+        "CC": "coarse grained"
+      }
+    },
+    "GV": {
+      "description": "Gravel",
+      "qualifiers": {
+        "CL": "clayey",
+        "SI": "silty",
+        "SA": "sandy",
+        "FF": "fine grained",
+        "FM": "fine to medium grained",
+        "FC": "fine to coarse grained",
+        "MM": "medium grained",
+        "MC": "medium to coarse grained",
+        "CC": "coarse grained"
+      }
+    },
+    "OB": {
+      "description": "Cobbles",
+      "qualifiers": {
+        "CL": "clayey",
+        "SI": "silty",
+        "SA": "sandy",
+        "GV": "gravelly"
+      }
+    },
+    "BO": {
+      "description": "Boulders",
+      "qualifiers": {
+        "CL": "clayey",
+        "SI": "silty",
+        "SA": "sandy",
+        "GV": "gravelly"
+      }
+    },
+    "SS": {
+      "description": "Sandstone",
+      "qualifiers": {
+        "FF": "fine grained",
+        "FM": "fine to medium grained",
+        "FC": "fine to coarse grained",
+        "MM": "medium grained",
+        "MC": "medium to coarse grained",
+        "CC": "coarse grained"
+      }
+    },
+    "CG": {
+      "description": "Conglomerate",
+      "qualifiers": {
+        "GG": "granular",
+        "GP": "granular to pebbly",
+        "GO": "granular to cobbly",
+        "GU": "granular to bouldery",
+        "PP": "pebbly",
+        "PO": "pebbly to cobbly",
+        "PU": "pebbly to bouldery",
+        "OO": "cobbly",
+        "OU": "cobbly to bouldery",
+        "UU": "bouldery"
+      }
+    },
+    "M1": {
+      "description": "Conglomerate (>65% matrix)",
+      "qualifiers": {
+        "GG": "granular",
+        "GP": "granular to pebbly",
+        "GO": "granular to cobbly",
+        "GU": "granular to bouldery",
+        "PP": "pebbly",
+        "PO": "pebbly to cobbly",
+        "PU": "pebbly to bouldery",
+        "OO": "cobbly",
+        "OU": "cobbly to bouldery",
+        "UU": "bouldery"
+      }
+    },
+    "M2": {
+      "description": "Conglomerate (35-65% matrix)",
+      "qualifiers": {
+        "GG": "granular",
+        "GP": "granular to pebbly",
+        "GO": "granular to cobbly",
+        "GU": "granular to bouldery",
+        "PP": "pebbly",
+        "PO": "pebbly to cobbly",
+        "PU": "pebbly to bouldery",
+        "OO": "cobbly",
+        "OU": "cobbly to bouldery",
+        "UU": "bouldery"
+      }
+    },
+    "M3": {
+      "description": "Conglomerate (<35% matrix)",
+      "qualifiers": {
+        "GG": "granular",
+        "GP": "granular to pebbly",
+        "GO": "granular to cobbly",
+        "GU": "granular to bouldery",
+        "PP": "pebbly",
+        "PO": "pebbly to cobbly",
+        "PU": "pebbly to bouldery",
+        "OO": "cobbly",
+        "OU": "cobbly to bouldery",
+        "UU": "bouldery"
+      }
+    },
+    "AL": {
+      "description": "Alluvium",
+      "qualifiers": {
+        "GG": "granular",
+        "GP": "granular to pebbly",
+        "GO": "granular to cobbly",
+        "GU": "granular to bouldery",
+        "PP": "pebbly",
+        "PO": "pebbly to cobbly",
+        "PU": "pebbly to bouldery",
+        "OO": "cobbly",
+        "OU": "cobbly to bouldery",
+        "UU": "bouldery"
+      }
+    },
+    "BR": {
+      "description": "Breccia",
+      "qualifiers": {
+        "CS": "clay sized",
+        "MS": "mud sized",
+        "TS": "silt sized",
+        "SS": "sand sized"
+      }
+    },
+    "FB": {
+      "description": "Fault Breccia",
+      "qualifiers": {
+        "CS": "clay sized",
+        "MS": "mud sized",
+        "TS": "silt sized",
+        "SS": "sand sized"
+      }
+    },
+    "TF": {
+      "description": "Tuff",
+      "qualifiers": {
+        "CS": "clay sized",
+        "MS": "mud sized",
+        "TS": "silt sized",
+        "SS": "sand sized"
+      }
+    },
+    "TT": {
+      "description": "Tuffite",
+      "qualifiers": {
+        "CS": "clay sized",
+        "MS": "mud sized",
+        "TS": "silt sized",
+        "SS": "sand sized"
+      }
+    }
+  }
+}
