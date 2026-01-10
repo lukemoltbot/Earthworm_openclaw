@@ -222,7 +222,7 @@ class MainWindow(QMainWindow):
         self.settings_tab = QWidget()
         self.settings_layout = QVBoxLayout(self.settings_tab)
         self.tab_widget.addTab(self.settings_tab, "Settings")
-        
+
         self.editor_tab = QWidget()
 
         # Create a single CurvePlotter widget
@@ -683,7 +683,10 @@ class MainWindow(QMainWindow):
         current_analysis_method = self.analysisMethodComboBox.currentText().lower()
         current_merge_thin_units = self.mergeThinUnitsCheckBox.isChecked()
         current_merge_threshold = self.merge_threshold  # Keep the loaded threshold
-        save_settings(self.lithology_rules, current_separator_thickness, current_draw_separators, current_curve_inversion_settings, current_curve_thickness, current_use_researched_defaults, current_analysis_method, current_merge_thin_units, current_merge_threshold)
+        current_smart_interbedding = self.smartInterbeddingCheckBox.isChecked()
+        current_smart_interbedding_max_sequence = self.smartInterbeddingMaxSequenceSpinBox.value()
+        current_smart_interbedding_thick_unit = self.smartInterbeddingThickUnitSpinBox.value()
+        save_settings(self.lithology_rules, current_separator_thickness, current_draw_separators, current_curve_inversion_settings, current_curve_thickness, current_use_researched_defaults, current_analysis_method, current_merge_thin_units, current_merge_threshold, current_smart_interbedding, current_smart_interbedding_max_sequence, current_smart_interbedding_thick_unit)
         
         if not auto_save: # Only show message if triggered by the "Update Settings" button
             QMessageBox.information(self, "Settings Updated", "All settings have been updated and saved.")
@@ -707,6 +710,10 @@ class MainWindow(QMainWindow):
         self.load_separator_settings()
         self.load_curve_thickness_settings() # Reload new setting
         self.load_curve_inversion_settings()
+        # Update smart interbedding UI elements to reflect reloaded settings
+        self.smartInterbeddingCheckBox.setChecked(self.smart_interbedding)
+        self.smartInterbeddingMaxSequenceSpinBox.setValue(self.smart_interbedding_max_sequence_length)
+        self.smartInterbeddingThickUnitSpinBox.setValue(self.smart_interbedding_thick_unit_threshold)
 
 
     def load_settings_from_file(self):
@@ -1298,73 +1305,12 @@ class MainWindow(QMainWindow):
         self.last_analysis_file = self.las_file_path
         self.last_analysis_timestamp = pd.Timestamp.now()
 
-        # Get separator settings from UI controls
-        separator_thickness = self.separatorThicknessSpinBox.value()
-        draw_separators = self.drawSeparatorsCheckBox.isChecked()
-        
-        # Calculate overall min and max depth from the classified_dataframe
-        # This ensures both plots use the same consistent depth scale
-        min_overall_depth = classified_dataframe[DEPTH_COLUMN].min()
-        max_overall_depth = classified_dataframe[DEPTH_COLUMN].max()
-
-        # Pass the overall depth range to the stratigraphic column
-        self.stratigraphicColumnView.draw_column(units_dataframe, min_overall_depth, max_overall_depth, separator_thickness, draw_separators)
-        
-        # Prepare curve configurations for the single CurvePlotter
-        curve_configs = []
-        curve_inversion_settings = {
-            'gamma': self.invertGammaCheckBox.isChecked(),
-            'short_space_density': self.invertShortSpaceDensityCheckBox.isChecked(),
-            'long_space_density': self.invertLongSpaceDensityCheckBox.isChecked()
-        }
-        current_curve_thickness = self.curveThicknessSpinBox.value()
-
-        if 'gamma' in classified_dataframe.columns:
-            curve_configs.append({
-                'name': 'gamma',
-                'min': CURVE_RANGES['gamma']['min'],
-                'max': CURVE_RANGES['gamma']['max'],
-                'color': CURVE_RANGES['gamma']['color'],
-                'inverted': curve_inversion_settings.get('gamma', False),
-                'thickness': current_curve_thickness
-            })
-        if 'short_space_density' in classified_dataframe.columns:
-            curve_configs.append({
-                'name': 'short_space_density',
-                'min': CURVE_RANGES['short_space_density']['min'],
-                'max': CURVE_RANGES['short_space_density']['max'],
-                'color': CURVE_RANGES['short_space_density']['color'],
-                'inverted': curve_inversion_settings.get('short_space_density', False),
-                'thickness': current_curve_thickness
-            })
-        if 'long_space_density' in classified_dataframe.columns:
-            curve_configs.append({
-                'name': 'long_space_density',
-                'min': CURVE_RANGES['long_space_density']['min'],
-                'max': CURVE_RANGES['long_space_density']['max'],
-                'color': CURVE_RANGES['long_space_density']['color'],
-                'inverted': curve_inversion_settings.get('long_space_density', False),
-                'thickness': current_curve_thickness
-            })
-        
-        # Update the single curve plotter and set its depth range
-        self.curvePlotter.set_curve_configs(curve_configs)
-        self.curvePlotter.set_data(classified_dataframe)
-        self.curvePlotter.set_depth_range(min_overall_depth, max_overall_depth)
-
-        editor_columns = [
-            'from_depth', 'to_depth', 'thickness', 'LITHOLOGY_CODE',
-            'lithology_qualifier', 'shade', 'hue', 'colour',
-            'weathering', 'estimated_strength', 'record_sequence',
-            'inter_relationship', 'percentage'
-        ]
-        if 'background_color' in units_dataframe.columns:
-            editor_columns.append('background_color')
-
-        editor_dataframe = units_dataframe[[col for col in editor_columns if col in units_dataframe.columns]]
-        self.editorTable.load_data(editor_dataframe)
-        self.tab_widget.setCurrentIndex(self.tab_widget.indexOf(self.editor_tab))
-        QMessageBox.information(self, "Analysis Complete", "Borehole analysis finished successfully!")
+        # Check for smart interbedding suggestions if enabled
+        print(f"DEBUG: Smart interbedding enabled check: {self.smart_interbedding}")
+        if self.smart_interbedding:
+            self._check_smart_interbedding_suggestions(units_dataframe, classified_dataframe)
+        else:
+            self._finalize_analysis_display(units_dataframe, classified_dataframe)
 
     def analysis_error(self, message):
         self.runAnalysisButton.setEnabled(True)
@@ -1904,6 +1850,155 @@ class MainWindow(QMainWindow):
                 self.stratigraphicColumnView.draw_column(updated_df, min_depth, max_depth, separator_thickness, draw_separators)
 
         QMessageBox.information(self, "Interbedding Created", f"Successfully created interbedding with {len(new_rows)} components.")
+
+    def _check_smart_interbedding_suggestions(self, units_dataframe, classified_dataframe):
+        """Check for smart interbedding suggestions and show dialog if found."""
+        try:
+            # Debug: Method Entry
+            print("DEBUG: _check_smart_interbedding_suggestions method called")
+            print(f"DEBUG: Smart interbedding enabled: {self.smart_interbedding}")
+            print(f"DEBUG: Max sequence length: {self.smart_interbedding_max_sequence_length}")
+            print(f"DEBUG: Thick unit threshold: {self.smart_interbedding_thick_unit_threshold}")
+
+            # Debug: Input Validation
+            print(f"DEBUG: Units dataframe shape: {units_dataframe.shape if hasattr(units_dataframe, 'shape') else 'No shape'}")
+            print(f"DEBUG: Units dataframe columns: {list(units_dataframe.columns) if hasattr(units_dataframe, 'columns') else 'No columns'}")
+            print(f"DEBUG: First 5 units: {units_dataframe.head() if hasattr(units_dataframe, 'head') else 'No head method'}")
+            print(f"DEBUG: Classified dataframe shape: {classified_dataframe.shape if hasattr(classified_dataframe, 'shape') else 'No shape'}")
+
+            # Create analyzer instance for post-processing
+            analyzer = Analyzer()
+
+            # Find interbedding candidates
+            max_sequence_length = self.smart_interbedding_max_sequence_length
+            thick_unit_threshold = self.smart_interbedding_thick_unit_threshold
+
+            print(f"DEBUG: Calling find_interbedding_candidates with max_sequence_length={max_sequence_length}, thick_unit_threshold={thick_unit_threshold}")
+            candidates = analyzer.find_interbedding_candidates(
+                units_dataframe,
+                max_sequence_length=max_sequence_length,
+                thick_unit_threshold=thick_unit_threshold
+            )
+
+            print(f"DEBUG: Found {len(candidates) if candidates else 0} interbedding candidates")
+
+            if candidates:
+                print("DEBUG: Candidates found, creating SmartInterbeddingSuggestionsDialog")
+                # Debug: Show candidate details
+                for i, candidate in enumerate(candidates):
+                    print(f"DEBUG: Candidate {i}: from_depth={candidate.get('from_depth')}, to_depth={candidate.get('to_depth')}, lithologies={len(candidate.get('lithologies', []))}")
+
+                # Show suggestions dialog
+                from .dialogs.smart_interbedding_suggestions_dialog import SmartInterbeddingSuggestionsDialog
+                dialog = SmartInterbeddingSuggestionsDialog(candidates, self)
+                print("DEBUG: SmartInterbeddingSuggestionsDialog created")
+
+                dialog_result = dialog.exec()
+                print(f"DEBUG: Dialog exec() returned: {dialog_result}")
+
+                if dialog_result:
+                    print("DEBUG: Dialog accepted, getting selected candidates")
+                    # Apply selected suggestions
+                    selected_indices = dialog.get_selected_candidates()
+                    print(f"DEBUG: Selected candidate indices: {selected_indices}")
+
+                    if selected_indices:
+                        print("DEBUG: Applying interbedding candidates")
+                        updated_units_df = analyzer.apply_interbedding_candidates(
+                            units_dataframe, candidates, selected_indices, self.lithology_rules
+                        )
+                        # Update stored dataframe
+                        self.last_units_dataframe = updated_units_df
+                        print(f"DEBUG: Updated units dataframe shape: {updated_units_df.shape if hasattr(updated_units_df, 'shape') else 'No shape'}")
+                    else:
+                        print("DEBUG: No candidates selected")
+                else:
+                    print("DEBUG: Dialog rejected")
+
+                # Continue to finalize display regardless of user choice
+                print("DEBUG: Finalizing analysis display with updated dataframe")
+                self._finalize_analysis_display(self.last_units_dataframe, classified_dataframe)
+            else:
+                print("DEBUG: No candidates found, proceeding with normal display")
+                # No candidates found, proceed normally
+                self._finalize_analysis_display(units_dataframe, classified_dataframe)
+
+        except Exception as e:
+            # Log error and continue with normal display
+            print(f"DEBUG: Exception in smart interbedding suggestions: {e}")
+            import traceback
+            traceback.print_exc()
+            self._finalize_analysis_display(units_dataframe, classified_dataframe)
+
+    def _finalize_analysis_display(self, units_dataframe, classified_dataframe):
+        """Finalize the analysis display after all processing is complete."""
+        # Get separator settings from UI controls
+        separator_thickness = self.separatorThicknessSpinBox.value()
+        draw_separators = self.drawSeparatorsCheckBox.isChecked()
+
+        # Calculate overall min and max depth from the classified_dataframe
+        # This ensures both plots use the same consistent depth scale
+        min_overall_depth = classified_dataframe[DEPTH_COLUMN].min()
+        max_overall_depth = classified_dataframe[DEPTH_COLUMN].max()
+
+        # Pass the overall depth range to the stratigraphic column
+        self.stratigraphicColumnView.draw_column(units_dataframe, min_overall_depth, max_overall_depth, separator_thickness, draw_separators)
+
+        # Prepare curve configurations for the single CurvePlotter
+        curve_configs = []
+        curve_inversion_settings = {
+            'gamma': self.invertGammaCheckBox.isChecked(),
+            'short_space_density': self.invertShortSpaceDensityCheckBox.isChecked(),
+            'long_space_density': self.invertLongSpaceDensityCheckBox.isChecked()
+        }
+        current_curve_thickness = self.curveThicknessSpinBox.value()
+
+        if 'gamma' in classified_dataframe.columns:
+            curve_configs.append({
+                'name': 'gamma',
+                'min': CURVE_RANGES['gamma']['min'],
+                'max': CURVE_RANGES['gamma']['max'],
+                'color': CURVE_RANGES['gamma']['color'],
+                'inverted': curve_inversion_settings.get('gamma', False),
+                'thickness': current_curve_thickness
+            })
+        if 'short_space_density' in classified_dataframe.columns:
+            curve_configs.append({
+                'name': 'short_space_density',
+                'min': CURVE_RANGES['short_space_density']['min'],
+                'max': CURVE_RANGES['short_space_density']['max'],
+                'color': CURVE_RANGES['short_space_density']['color'],
+                'inverted': curve_inversion_settings.get('short_space_density', False),
+                'thickness': current_curve_thickness
+            })
+        if 'long_space_density' in classified_dataframe.columns:
+            curve_configs.append({
+                'name': 'long_space_density',
+                'min': CURVE_RANGES['long_space_density']['min'],
+                'max': CURVE_RANGES['long_space_density']['max'],
+                'color': CURVE_RANGES['long_space_density']['color'],
+                'inverted': curve_inversion_settings.get('long_space_density', False),
+                'thickness': current_curve_thickness
+            })
+
+        # Update the single curve plotter and set its depth range
+        self.curvePlotter.set_curve_configs(curve_configs)
+        self.curvePlotter.set_data(classified_dataframe)
+        self.curvePlotter.set_depth_range(min_overall_depth, max_overall_depth)
+
+        editor_columns = [
+            'from_depth', 'to_depth', 'thickness', 'LITHOLOGY_CODE',
+            'lithology_qualifier', 'shade', 'hue', 'colour',
+            'weathering', 'estimated_strength', 'record_sequence',
+            'inter_relationship', 'percentage'
+        ]
+        if 'background_color' in units_dataframe.columns:
+            editor_columns.append('background_color')
+
+        editor_dataframe = units_dataframe[[col for col in editor_columns if col in units_dataframe.columns]]
+        self.editorTable.load_data(editor_dataframe)
+        self.tab_widget.setCurrentIndex(self.tab_widget.indexOf(self.editor_tab))
+        QMessageBox.information(self, "Analysis Complete", "Borehole analysis finished successfully!")
 
     def _schedule_gap_visualization_update(self):
         """Schedule a debounced update of the gap visualization to prevent excessive updates during rapid user input."""

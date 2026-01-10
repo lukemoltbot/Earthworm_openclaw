@@ -357,10 +357,309 @@ class Analyzer:
         # Ensure the DataFrame is sorted by depth for correct grouping
         sorted_df = dataframe.sort_values(by=DEPTH_COLUMN).reset_index(drop=True)
 
-        if smart_interbedding:
-            return self._group_with_smart_interbedding(sorted_df, rules_map, smart_interbedding_max_sequence_length, smart_interbedding_thick_unit_threshold)
+        # Always use standard grouping - smart interbedding now runs as post-processing
+        return self._group_standard_units(sorted_df, rules_map)
+
+    def find_interbedding_candidates(self, units_df, max_sequence_length=10, thick_unit_threshold=0.5):
+        """
+        Scan units dataframe for potential interbedding candidates.
+        This runs as post-processing after analysis is complete.
+
+        Args:
+            units_df (pandas.DataFrame): DataFrame of lithological units
+            max_sequence_length (int): Maximum number of alternating units to consider
+            thick_unit_threshold (float): Skip interbedding detection for units thicker than this
+
+        Returns:
+            list: List of interbedding candidate dictionaries
+        """
+        print(f"DEBUG: find_interbedding_candidates called with max_sequence_length={max_sequence_length}, thick_unit_threshold={thick_unit_threshold}")
+        print(f"DEBUG: units_df shape: {units_df.shape if hasattr(units_df, 'shape') else 'No shape'}")
+        print(f"DEBUG: units_df columns: {list(units_df.columns) if hasattr(units_df, 'columns') else 'No columns'}")
+
+        if units_df.empty or len(units_df) <= 1:
+            print("DEBUG: units_df is empty or has <= 1 rows, returning empty candidates")
+            return []
+
+        candidates = []
+        i = 0
+        total_iterations = 0
+
+        print(f"DEBUG: Starting scan through {len(units_df)} units")
+        while i < len(units_df) and total_iterations < 1000:  # Safety limit
+            print(f"DEBUG: Iteration {total_iterations}, checking from index {i}")
+            # Look for alternating pattern starting from current position
+            candidate = self._find_interbedding_candidate(units_df, i, max_sequence_length, thick_unit_threshold)
+
+            if candidate:
+                print(f"DEBUG: Found candidate at index {i}: {candidate.get('from_depth')} - {candidate.get('to_depth')}, {len(candidate.get('lithologies', []))} lithologies")
+                candidates.append(candidate)
+                # Skip the units that were included in this candidate
+                units_skipped = len(candidate['original_sequence'])
+                print(f"DEBUG: Skipping {units_skipped} units after finding candidate")
+                i += units_skipped
+            else:
+                print(f"DEBUG: No candidate found at index {i}, moving to next unit")
+                i += 1
+
+            total_iterations += 1
+
+        print(f"DEBUG: Scan complete. Found {len(candidates)} interbedding candidates")
+        for idx, cand in enumerate(candidates):
+            print(f"DEBUG: Candidate {idx}: from_depth={cand.get('from_depth')}, to_depth={cand.get('to_depth')}, lithologies={[l.get('code') for l in cand.get('lithologies', [])]}")
+
+        logger.debug(f"Found {len(candidates)} interbedding candidates")
+        return candidates
+
+    def _find_interbedding_candidate(self, units_df, start_idx, max_sequence_length=10, thick_unit_threshold=0.5):
+        """
+        Find a single interbedding candidate starting from the given index.
+
+        Args:
+            units_df (pandas.DataFrame): DataFrame of lithological units
+            start_idx (int): Starting index in the units dataframe
+            max_sequence_length (int): Maximum number of alternating units to consider
+            thick_unit_threshold (float): Skip interbedding detection for units thicker than this
+
+        Returns:
+            dict: Interbedding candidate dictionary or None if no candidate found
+        """
+        print(f"DEBUG: _find_interbedding_candidate called with start_idx={start_idx}, max_sequence_length={max_sequence_length}, thick_unit_threshold={thick_unit_threshold}")
+
+        if start_idx >= len(units_df):
+            print("DEBUG: start_idx >= len(units_df), returning None")
+            return None
+
+        # Get sequence of alternating units
+        print(f"DEBUG: Calling _extract_alternating_sequence from index {start_idx}")
+        sequence = self._extract_alternating_sequence(units_df, start_idx, max_sequence_length, thick_unit_threshold)
+        print(f"DEBUG: _extract_alternating_sequence returned {len(sequence) if sequence else 0} units")
+
+        if not sequence or len(sequence) < 3:  # Need at least 3 units for meaningful interbedding
+            print(f"DEBUG: Sequence too short (length={len(sequence) if sequence else 0}), need at least 3 units. Returning None")
+            return None
+
+        # Calculate metrics for the sequence
+        total_thickness = sum(unit['thickness'] for unit in sequence)
+        print(f"DEBUG: Total thickness of sequence: {total_thickness}")
+
+        # Calculate average layer thickness (total thickness ÷ number of layers)
+        # This matches the user's specification: "the layer thickness calculation should be a sum of all grouped lithology units that are creating the interbedded section"
+        avg_layer_thickness = total_thickness / len(sequence)
+        print(f"DEBUG: Average layer thickness: {avg_layer_thickness}")
+
+        # Only consider for interbedding if average layer thickness < 200mm
+        if avg_layer_thickness >= 0.2:
+            print(f"DEBUG: Average layer thickness {avg_layer_thickness} >= 0.2m, not considering for interbedding")
+            return None
+
+        print("DEBUG: Average layer thickness < 0.2m, proceeding with interbedding analysis")
+
+        # Determine interrelationship code based on average layer thickness
+        if avg_layer_thickness < 0.02:
+            inter_code = 'IL'  # Interlaminated (< 20mm)
+        elif avg_layer_thickness < 0.06:
+            inter_code = 'UB'  # Very Thinly Interbedded (20-60mm)
+        elif avg_layer_thickness < 0.2:
+            inter_code = 'TB'  # Thinly Interbedded (60-200mm)
         else:
-            return self._group_standard_units(sorted_df, rules_map)
+            inter_code = 'CB'  # Coarsely Interbedded (> 200mm)
+
+        print(f"DEBUG: Determined interrelationship code: {inter_code}")
+
+        # Calculate lithology percentages and dominance
+        lithology_thicknesses = {}
+        for unit in sequence:
+            code = unit[LITHOLOGY_COLUMN]
+            lithology_thicknesses[code] = lithology_thicknesses.get(code, 0) + unit['thickness']
+
+        print(f"DEBUG: Lithology thicknesses: {lithology_thicknesses}")
+
+        # Sort by thickness (dominance) - user specified "by total thickness"
+        sorted_lithologies = sorted(lithology_thicknesses.items(), key=lambda x: x[1], reverse=True)
+        print(f"DEBUG: Sorted lithologies by thickness: {sorted_lithologies}")
+
+        # Create lithology components with percentages and sequence numbers
+        lithologies = []
+        for seq_num, (code, thickness) in enumerate(sorted_lithologies, 1):
+            percentage = (thickness / total_thickness) * 100
+            print(f"DEBUG: Lithology {code}: thickness={thickness}, percentage={percentage}")
+
+            # Skip lithologies < 5% unless they are the dominant one
+            if seq_num > 1 and percentage < 5:
+                print(f"DEBUG: Skipping lithology {code} (percentage {percentage} < 5% and not dominant)")
+                continue
+
+            lithologies.append({
+                'code': code,
+                'thickness': thickness,
+                'percentage': round(percentage, 2),
+                'sequence': seq_num
+            })
+
+        print(f"DEBUG: Final lithologies list: {[l['code'] for l in lithologies]}")
+
+        # Only proceed if we have at least 2 lithologies after filtering
+        if len(lithologies) < 2:
+            print(f"DEBUG: Only {len(lithologies)} lithologies after filtering, need at least 2. Returning None")
+            return None
+
+        # Create candidate dictionary
+        candidate = {
+            'from_depth': sequence[0]['from_depth'],
+            'to_depth': sequence[-1]['to_depth'],
+            'original_sequence': sequence,
+            'lithologies': lithologies,
+            'average_layer_thickness': avg_layer_thickness,
+            'interrelationship_code': inter_code,
+            'total_thickness': total_thickness
+        }
+
+        print(f"DEBUG: Created candidate: from_depth={candidate['from_depth']}, to_depth={candidate['to_depth']}")
+        return candidate
+
+    def _extract_alternating_sequence(self, units_df, start_idx, max_sequence_length=10, thick_unit_threshold=0.5):
+        """
+        Extract a sequence of alternating lithology units.
+
+        Args:
+            units_df (pandas.DataFrame): DataFrame of lithological units
+            start_idx (int): Starting index
+            max_sequence_length (int): Maximum sequence length
+            thick_unit_threshold (float): Stop if unit exceeds this thickness
+
+        Returns:
+            list: List of unit dictionaries in the alternating sequence
+        """
+        print(f"DEBUG: _extract_alternating_sequence called with start_idx={start_idx}, max_sequence_length={max_sequence_length}, thick_unit_threshold={thick_unit_threshold}")
+
+        if start_idx >= len(units_df):
+            print("DEBUG: start_idx >= len(units_df), returning empty sequence")
+            return []
+
+        sequence = []
+        current_code = None
+        units_added = 0
+
+        print(f"DEBUG: Scanning from index {start_idx} to {min(start_idx + max_sequence_length, len(units_df))}")
+
+        for i in range(start_idx, min(start_idx + max_sequence_length, len(units_df))):
+            unit = units_df.iloc[i]
+            unit_code = unit[LITHOLOGY_COLUMN]
+            unit_thickness = unit['thickness']
+
+            print(f"DEBUG: Checking unit at index {i}: code={unit_code}, thickness={unit_thickness}")
+
+            # Skip units that are too thick (user's thick unit threshold)
+            if unit_thickness > thick_unit_threshold:
+                print(f"DEBUG: Unit thickness {unit_thickness} > thick_unit_threshold {thick_unit_threshold}, stopping sequence extraction")
+                break
+
+            # If this is a different lithology than the previous one, add it
+            if unit_code != current_code:
+                print(f"DEBUG: Adding unit with code {unit_code} (different from previous {current_code})")
+                sequence.append(unit.to_dict())
+                current_code = unit_code
+                units_added += 1
+
+                # Stop if we've added too many units
+                if units_added >= max_sequence_length:
+                    print(f"DEBUG: Reached max_sequence_length {max_sequence_length}, stopping")
+                    break
+            else:
+                print(f"DEBUG: Same lithology {unit_code} as previous, breaking alternating pattern")
+                # Same lithology - this breaks the alternating pattern
+                break
+
+        print(f"DEBUG: Extracted sequence with {len(sequence)} units: {[u[LITHOLOGY_COLUMN] for u in sequence]}")
+        return sequence
+
+    def apply_interbedding_candidates(self, units_df, candidates, selected_indices, lithology_rules):
+        """
+        Apply selected interbedding candidates to create interbedded units.
+
+        Args:
+            units_df (pandas.DataFrame): Original units dataframe
+            candidates (list): List of all candidate dictionaries
+            selected_indices (list): List of indices of selected candidates
+            lithology_rules (list): List of lithology rules for rule lookup
+
+        Returns:
+            pandas.DataFrame: Updated units dataframe with interbedded units
+        """
+        if not selected_indices:
+            return units_df
+
+        # Create rules map for lookup
+        rules_map = {rule['code']: rule for rule in lithology_rules}
+
+        # Sort selected candidates by starting depth (process in order)
+        candidates_to_apply = [candidates[idx] for idx in sorted(selected_indices)]
+
+        updated_units = []
+        units_processed = 0
+
+        for candidate in candidates_to_apply:
+            # Find the range of units this candidate covers
+            candidate_start_depth = candidate['from_depth']
+            candidate_end_depth = candidate['to_depth']
+
+            # Add any units before this candidate
+            while units_processed < len(units_df):
+                unit = units_df.iloc[units_processed]
+                if unit['from_depth'] >= candidate_start_depth:
+                    break
+                updated_units.append(unit.to_dict())
+                units_processed += 1
+
+            # Create interbedded units for this candidate
+            for lithology in candidate['lithologies']:
+                rule = rules_map.get(lithology['code'], {})
+
+                interbedded_unit = {
+                    'from_depth': candidate_start_depth,
+                    'to_depth': candidate_end_depth,
+                    'thickness': candidate_end_depth - candidate_start_depth,  # Full section thickness
+                    LITHOLOGY_COLUMN: lithology['code'],
+                    'lithology_qualifier': rule.get('qualifier', ''),
+                    'shade': rule.get('shade', ''),
+                    'hue': rule.get('hue', ''),
+                    'colour': rule.get('colour', ''),
+                    'weathering': rule.get('weathering', ''),
+                    'estimated_strength': rule.get('strength', ''),
+                    'background_color': rule.get('background_color', '#FFFFFF'),
+                    'svg_path': rule.get('svg_path'),
+                    'record_sequence': lithology['sequence'],
+                    'inter_relationship': candidate['interrelationship_code'] if lithology['sequence'] == 1 else '',
+                    'percentage': lithology['percentage']
+                }
+                updated_units.append(interbedded_unit)
+
+            # Skip the original units that were replaced by interbedding
+            while units_processed < len(units_df):
+                unit = units_df.iloc[units_processed]
+                if unit['to_depth'] > candidate_end_depth:
+                    break
+                units_processed += 1
+
+        # Add any remaining units
+        while units_processed < len(units_df):
+            updated_units.append(units_df.iloc[units_processed].to_dict())
+            units_processed += 1
+
+        # Convert back to DataFrame
+        result_df = pd.DataFrame(updated_units)
+
+        # Ensure proper column ordering
+        if not result_df.empty:
+            result_df = result_df[[
+                'from_depth', 'to_depth', 'thickness', LITHOLOGY_COLUMN,
+                'lithology_qualifier', 'shade', 'hue', 'colour',
+                'weathering', 'estimated_strength', 'background_color', 'svg_path',
+                'record_sequence', 'inter_relationship', 'percentage'
+            ]]
+
+        return result_df
 
     def _group_standard_units(self, sorted_df, rules_map):
         """Standard unit grouping without interbedding detection."""
