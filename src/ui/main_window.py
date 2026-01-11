@@ -659,8 +659,13 @@ class MainWindow(QMainWindow):
                 current_merge_thin_units = self.mergeThinUnitsCheckBox.isChecked()
                 current_merge_threshold = self.merge_threshold  # Keep the loaded threshold
 
+                # Get current smart interbedding settings
+                current_smart_interbedding = self.smartInterbeddingCheckBox.isChecked()
+                current_smart_interbedding_max_sequence = self.smartInterbeddingMaxSequenceSpinBox.value()
+                current_smart_interbedding_thick_unit = self.smartInterbeddingThickUnitSpinBox.value()
+
                 # Call save_settings with the chosen file path
-                save_settings(self.lithology_rules, current_separator_thickness, current_draw_separators, current_curve_inversion_settings, current_curve_thickness, current_use_researched_defaults, current_analysis_method, current_merge_thin_units, current_merge_threshold, file_path)
+                save_settings(self.lithology_rules, current_separator_thickness, current_draw_separators, current_curve_inversion_settings, current_curve_thickness, current_use_researched_defaults, current_analysis_method, current_merge_thin_units, current_merge_threshold, current_smart_interbedding, current_smart_interbedding_max_sequence, current_smart_interbedding_thick_unit, file_path)
                 QMessageBox.information(self, "Settings Saved", f"Settings saved to {os.path.basename(file_path)}")
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Failed to save settings: {e}")
@@ -687,33 +692,38 @@ class MainWindow(QMainWindow):
         current_smart_interbedding_max_sequence = self.smartInterbeddingMaxSequenceSpinBox.value()
         current_smart_interbedding_thick_unit = self.smartInterbeddingThickUnitSpinBox.value()
         save_settings(self.lithology_rules, current_separator_thickness, current_draw_separators, current_curve_inversion_settings, current_curve_thickness, current_use_researched_defaults, current_analysis_method, current_merge_thin_units, current_merge_threshold, current_smart_interbedding, current_smart_interbedding_max_sequence, current_smart_interbedding_thick_unit)
-        
+
+        # Update instance variables to ensure smart interbedding uses current values
+        self.smart_interbedding = current_smart_interbedding
+        self.smart_interbedding_max_sequence_length = current_smart_interbedding_max_sequence
+        self.smart_interbedding_thick_unit_threshold = current_smart_interbedding_thick_unit
+
         if not auto_save: # Only show message if triggered by the "Update Settings" button
             QMessageBox.information(self, "Settings Updated", "All settings have been updated and saved.")
-        
-        # Reload settings to ensure UI reflects saved state (especially after manual edits)
-        app_settings = load_settings()
-        self.lithology_rules = app_settings["lithology_rules"]
-        self.initial_separator_thickness = app_settings["separator_thickness"]
-        self.initial_draw_separators = app_settings["draw_separator_lines"]
-        self.initial_curve_inversion_settings = app_settings["curve_inversion_settings"]
-        self.initial_curve_thickness = app_settings["curve_thickness"] # Reload new setting
-        self.use_researched_defaults = app_settings["use_researched_defaults"]
-        self.useResearchedDefaultsCheckBox.setChecked(self.use_researched_defaults)
-        self.analysis_method = app_settings.get("analysis_method", "standard")
-        if hasattr(self, 'analysisMethodComboBox'):
-            if self.analysis_method == "simple":
-                self.analysisMethodComboBox.setCurrentText("Simple")
-            else:
-                self.analysisMethodComboBox.setCurrentText("Standard")
-        self.load_settings_rules_to_table()
-        self.load_separator_settings()
-        self.load_curve_thickness_settings() # Reload new setting
-        self.load_curve_inversion_settings()
-        # Update smart interbedding UI elements to reflect reloaded settings
-        self.smartInterbeddingCheckBox.setChecked(self.smart_interbedding)
-        self.smartInterbeddingMaxSequenceSpinBox.setValue(self.smart_interbedding_max_sequence_length)
-        self.smartInterbeddingThickUnitSpinBox.setValue(self.smart_interbedding_thick_unit_threshold)
+
+            # Reload settings to ensure UI reflects saved state (only for manual updates)
+            app_settings = load_settings()
+            self.lithology_rules = app_settings["lithology_rules"]
+            self.initial_separator_thickness = app_settings["separator_thickness"]
+            self.initial_draw_separators = app_settings["draw_separator_lines"]
+            self.initial_curve_inversion_settings = app_settings["curve_inversion_settings"]
+            self.initial_curve_thickness = app_settings["curve_thickness"] # Reload new setting
+            self.use_researched_defaults = app_settings["use_researched_defaults"]
+            self.useResearchedDefaultsCheckBox.setChecked(self.use_researched_defaults)
+            self.analysis_method = app_settings.get("analysis_method", "standard")
+            if hasattr(self, 'analysisMethodComboBox'):
+                if self.analysis_method == "simple":
+                    self.analysisMethodComboBox.setCurrentText("Simple")
+                else:
+                    self.analysisMethodComboBox.setCurrentText("Standard")
+            self.load_settings_rules_to_table()
+            self.load_separator_settings()
+            self.load_curve_thickness_settings() # Reload new setting
+            self.load_curve_inversion_settings()
+            # Update smart interbedding UI elements to reflect reloaded settings
+            self.smartInterbeddingCheckBox.setChecked(self.smart_interbedding)
+            self.smartInterbeddingMaxSequenceSpinBox.setValue(self.smart_interbedding_max_sequence_length)
+            self.smartInterbeddingThickUnitSpinBox.setValue(self.smart_interbedding_thick_unit_threshold)
 
 
     def load_settings_from_file(self):

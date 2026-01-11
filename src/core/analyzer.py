@@ -571,6 +571,32 @@ class Analyzer:
                 # Same lithology - this breaks the alternating pattern
                 break
 
+        # Validate that the sequence alternates between exactly 2 lithologies
+        if len(sequence) >= 3:  # Need at least 3 units for meaningful alternation
+            codes = [u[LITHOLOGY_COLUMN] for u in sequence]
+            unique_codes = list(set(codes))
+
+            # For interbedding, we require STRICT alternation between exactly 2 lithologies
+            if len(unique_codes) != 2:
+                print(f"DEBUG: Sequence has {len(unique_codes)} unique lithologies (need exactly 2), returning empty sequence")
+                return []
+
+            # Check if it strictly alternates between the two lithologies
+            litho_a, litho_b = unique_codes[0], unique_codes[1]
+
+            # The sequence must alternate: A-B-A-B-A-B... or B-A-B-A-B-A...
+            expected_pattern_ab = [litho_a, litho_b] * (len(sequence) // 2)
+            if len(sequence) % 2 == 1:
+                expected_pattern_ab.append(litho_a)
+
+            expected_pattern_ba = [litho_b, litho_a] * (len(sequence) // 2)
+            if len(sequence) % 2 == 1:
+                expected_pattern_ba.append(litho_b)
+
+            if codes != expected_pattern_ab and codes != expected_pattern_ba:
+                print(f"DEBUG: Sequence does not strictly alternate between {litho_a} and {litho_b}, returning empty sequence")
+                return []
+
         print(f"DEBUG: Extracted sequence with {len(sequence)} units: {[u[LITHOLOGY_COLUMN] for u in sequence]}")
         return sequence
 
@@ -619,7 +645,7 @@ class Analyzer:
                 interbedded_unit = {
                     'from_depth': candidate_start_depth,
                     'to_depth': candidate_end_depth,
-                    'thickness': candidate_end_depth - candidate_start_depth,  # Full section thickness
+                    'thickness': 0.0 if lithology['sequence'] > 1 else candidate_end_depth - candidate_start_depth,
                     LITHOLOGY_COLUMN: lithology['code'],
                     'lithology_qualifier': rule.get('qualifier', ''),
                     'shade': rule.get('shade', ''),
@@ -659,7 +685,196 @@ class Analyzer:
                 'record_sequence', 'inter_relationship', 'percentage'
             ]]
 
+        # Apply post-processing: merge adjacent interbedded sections with same dominant lithology
+        result_df = self.merge_adjacent_interbedded_sections(result_df)
+
         return result_df
+
+    def merge_adjacent_interbedded_sections(self, units_df):
+        """
+        Merge adjacent interbedded sections that have the same dominant lithology.
+        This runs as post-processing after interbedding candidates have been applied.
+
+        Args:
+            units_df (pandas.DataFrame): DataFrame of units after interbedding applied
+
+        Returns:
+            pandas.DataFrame: DataFrame with adjacent interbedded sections merged
+        """
+        if units_df.empty or len(units_df) <= 1:
+            return units_df
+
+        # Ensure units are sorted by depth
+        sorted_units = units_df.sort_values('from_depth').reset_index(drop=True)
+
+        merged_units = []
+        i = 0
+
+        while i < len(sorted_units):
+            current_unit = sorted_units.iloc[i].copy()
+
+            # Check if this is an interbedded unit (has record_sequence)
+            current_is_interbedded = (pd.notna(current_unit.get('record_sequence')) and
+                                    str(current_unit.get('record_sequence', '')).strip() != '' and
+                                    current_unit.get('record_sequence') != '')
+
+            if not current_is_interbedded:
+                # Not an interbedded unit, add as-is
+                merged_units.append(current_unit)
+                i += 1
+                continue
+
+            # Look for adjacent interbedded sections to potentially merge
+            merge_candidates = [current_unit.to_dict()]  # Start with current unit
+            j = i + 1
+
+            while j < len(sorted_units):
+                next_unit = sorted_units.iloc[j]
+
+                # Check if next unit is interbedded
+                next_is_interbedded = (pd.notna(next_unit.get('record_sequence')) and
+                                     str(next_unit.get('record_sequence', '')).strip() != '' and
+                                     next_unit.get('record_sequence') != '')
+
+                if not next_is_interbedded:
+                    # Next unit is not interbedded, stop looking
+                    break
+
+                # Check if they are adjacent (current to_depth == next from_depth)
+                are_adjacent = abs(current_unit['to_depth'] - next_unit['from_depth']) < 1e-6  # Small tolerance for floating point
+
+                if not are_adjacent:
+                    # Not adjacent, stop looking
+                    break
+
+                # Check if they have the same dominant lithology (both have sequence == 1)
+                current_dominant = None
+                next_dominant = None
+
+                # Find dominant lithology in current merged group
+                current_lithologies = []
+                for unit in merge_candidates:
+                    if unit.get('record_sequence') == 1:
+                        current_dominant = unit[LITHOLOGY_COLUMN]
+                        break
+
+                # Check next unit's dominant lithology
+                if next_unit.get('record_sequence') == 1:
+                    next_dominant = next_unit[LITHOLOGY_COLUMN]
+
+                # Only merge if dominant lithologies match
+                if current_dominant != next_dominant:
+                    break
+
+                # Count total unique lithologies if we merge this unit
+                all_lithologies = set()
+                for unit in merge_candidates:
+                    all_lithologies.add(unit[LITHOLOGY_COLUMN])
+                all_lithologies.add(next_unit[LITHOLOGY_COLUMN])
+
+                # Don't exceed 4 lithology types
+                if len(all_lithologies) > 4:
+                    break
+
+                # Add to merge candidates
+                merge_candidates.append(next_unit.to_dict())
+                j += 1
+
+            # If we found multiple units to merge, create merged section
+            if len(merge_candidates) > 1:
+                merged_section = self._create_merged_interbedded_section(merge_candidates)
+                merged_units.extend(merged_section)
+                i = j  # Skip the merged units
+            else:
+                # No merging needed, add current unit
+                merged_units.append(current_unit)
+                i += 1
+
+        # Convert back to DataFrame
+        result_df = pd.DataFrame(merged_units)
+
+        # Ensure proper column ordering
+        if not result_df.empty:
+            result_df = result_df[[
+                'from_depth', 'to_depth', 'thickness', LITHOLOGY_COLUMN,
+                'lithology_qualifier', 'shade', 'hue', 'colour',
+                'weathering', 'estimated_strength', 'background_color', 'svg_path',
+                'record_sequence', 'inter_relationship', 'percentage'
+            ]]
+
+        return result_df
+
+    def _create_merged_interbedded_section(self, merge_candidates):
+        """
+        Create a merged interbedded section from multiple adjacent interbedded sections.
+
+        Args:
+            merge_candidates (list): List of unit dictionaries to merge
+
+        Returns:
+            list: List of merged unit dictionaries
+        """
+        # Get overall depth range
+        from_depth = min(unit['from_depth'] for unit in merge_candidates)
+        to_depth = max(unit['to_depth'] for unit in merge_candidates)
+        total_thickness = to_depth - from_depth
+
+        # Collect all lithology components and their thicknesses
+        lithology_data = {}
+
+        for unit in merge_candidates:
+            lith_code = unit[LITHOLOGY_COLUMN]
+            unit_thickness = unit['thickness']
+
+            if lith_code not in lithology_data:
+                lithology_data[lith_code] = {
+                    'total_thickness': 0.0,
+                    'unit_template': unit.copy()
+                }
+
+            lithology_data[lith_code]['total_thickness'] += unit_thickness
+
+        # Sort lithologies by total thickness (dominance)
+        sorted_lithologies = sorted(lithology_data.items(),
+                                  key=lambda x: x[1]['total_thickness'],
+                                  reverse=True)
+
+        # Create merged units (up to 4 lithology types)
+        merged_units = []
+        for seq_num, (lith_code, data) in enumerate(sorted_lithologies[:4], 1):  # Max 4 types
+            percentage = (data['total_thickness'] / total_thickness) * 100
+
+            # Use template from first occurrence of this lithology
+            merged_unit = data['unit_template'].copy()
+
+            # Update merged properties
+            merged_unit.update({
+                'from_depth': from_depth,
+                'to_depth': to_depth,
+                'thickness': 0.0 if seq_num > 1 else total_thickness,  # Only dominant gets full thickness
+                'record_sequence': seq_num,
+                'percentage': round(percentage, 2)
+            })
+
+            # Only the dominant lithology gets inter_relationship code
+            if seq_num == 1:
+                # Recalculate interrelationship code based on merged section
+                avg_layer_thickness = total_thickness / len(merge_candidates)
+                if avg_layer_thickness < 0.02:
+                    inter_code = 'IL'  # Interlaminated
+                elif avg_layer_thickness < 0.06:
+                    inter_code = 'UB'  # Very Thinly Interbedded
+                elif avg_layer_thickness < 0.2:
+                    inter_code = 'TB'  # Thinly Interbedded
+                else:
+                    inter_code = 'CB'  # Coarsely Interbedded
+                merged_unit['inter_relationship'] = inter_code
+            else:
+                merged_unit['inter_relationship'] = ''
+
+            merged_units.append(merged_unit)
+
+        return merged_units
 
     def _group_standard_units(self, sorted_df, rules_map):
         """Standard unit grouping without interbedding detection."""
@@ -863,8 +1078,8 @@ class Analyzer:
         return None
 
     def _is_alternating_sequence(self, sequence):
-        """Check if sequence represents alternating lithologies."""
-        if len(sequence) < 4:  # Need at least 2 full cycles
+        """Check if sequence represents STRICT alternating lithologies for interbedding."""
+        if len(sequence) < 3:  # Need at least 3 units for meaningful alternation
             return False
 
         # Get unique codes in sequence
@@ -874,23 +1089,24 @@ class Analyzer:
         if len(unique_codes) < 2:
             return False  # Not alternating if only one lithology
 
-        # For simple alternating between 2 lithologies
-        if len(unique_codes) == 2:
-            # Check if it alternates between the two
-            expected_pattern = [unique_codes[0], unique_codes[1]] * (len(sequence) // 2)
-            if len(sequence) % 2 == 1:
-                expected_pattern.append(unique_codes[0])
-            return codes == expected_pattern
+        # For interbedding, we require STRICT alternation between exactly 2 lithologies
+        # No more than 2 lithologies allowed in an interbedded sequence
+        if len(unique_codes) > 2:
+            return False
 
-        # For more than 2 lithologies, ensure no lithology repeats consecutively
-        # This prevents patterns like A-A-B-C which are not truly alternating
-        for i in range(1, len(codes)):
-            if codes[i] == codes[i-1]:
-                return False  # Consecutive same lithology found
+        # Check if it strictly alternates between the two lithologies
+        litho_a, litho_b = unique_codes[0], unique_codes[1]
 
-        # Ensure we have alternation (no more than 2 consecutive different lithologies in a row if more than 2 types)
-        # This is a basic check - more sophisticated logic could be added later
-        return True
+        # The sequence must alternate: A-B-A-B-A-B... or B-A-B-A-B-A...
+        expected_pattern_ab = [litho_a, litho_b] * (len(sequence) // 2)
+        if len(sequence) % 2 == 1:
+            expected_pattern_ab.append(litho_a)
+
+        expected_pattern_ba = [litho_b, litho_a] * (len(sequence) // 2)
+        if len(sequence) % 2 == 1:
+            expected_pattern_ba.append(litho_b)
+
+        return codes == expected_pattern_ab or codes == expected_pattern_ba
 
     def _process_interbedded_sequence(self, sorted_df, sequence, rules_map):
         """Process an interbedded sequence into multiple unit rows."""
