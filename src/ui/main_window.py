@@ -1,12 +1,11 @@
 from PyQt6.QtWidgets import (
     QMainWindow, QVBoxLayout, QHBoxLayout, QWidget,
     QPushButton, QComboBox, QLabel, QGraphicsView, QFileDialog, QMessageBox,
-    QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QColorDialog, QGraphicsScene, QDoubleSpinBox, QCheckBox, QSlider, QSpinBox, QFrame, QSplitter, QAbstractItemView
-)
+    QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QColorDialog, QGraphicsScene, QDoubleSpinBox, QCheckBox, QSlider, QSpinBox, QFrame, QSplitter, QAbstractItemView, QMdiArea, QMdiSubWindow, QDockWidget, QTreeView)
 from PyQt6.QtGui import QPainter, QPixmap, QColor, QFont, QBrush
 from PyQt6.QtSvg import QSvgRenderer
 from PyQt6.QtSvgWidgets import QGraphicsSvgItem
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QObject, QPointF, QTimer
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QObject, QPointF, QTimer, QFileSystemModel, QDir
 import pandas as pd
 import numpy as np
 import os
@@ -104,6 +103,122 @@ class Worker(QObject):
             full_traceback = traceback.format_exc()
             self.error.emit(f"Analysis failed: {str(e)}\n\nTraceback:\n{full_traceback}")
 
+
+
+# ====== MDI SUB-WINDOW CLASS ======
+class HoleEditorSubWindow(QMdiSubWindow):
+    """
+    MDI Sub-window for individual drill hole editing.
+    Contains the Earthworm editing interface for one drill hole.
+    """
+    def __init__(self, file_path=None, parent=None):
+        super().__init__(parent)
+        self.file_path = file_path
+        self.main_window = parent  # Reference to main window
+        self.setWindowTitle(f"Hole Editor - {os.path.basename(file_path) if file_path else 'Untitled'}")
+        
+        # Placeholder widget - will be replaced with actual Earthworm interface
+        placeholder = QWidget()
+        layout = QVBoxLayout(placeholder)
+        label = QLabel(f"Drill Hole: {file_path or 'New Hole'}")
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(label)
+        
+        self.setWidget(placeholder)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+    
+    def load_file(self, file_path):
+        """Load a drill hole file into this editor"""
+        self.file_path = file_path
+        self.setWindowTitle(f"Hole Editor - {os.path.basename(file_path)}")
+        # TODO: Implement actual file loading
+
+
+
+# ====== PROJECT INDEXER SIDEBAR ======
+class ProjectIndexerSidebar(QDockWidget):
+    """
+    Persistent project indexer sidebar for Earthworm.
+    Provides a file browser for quick access to drill hole files.
+    """
+    
+    def __init__(self, parent=None):
+        super().__init__("Project Indexer", parent)
+        self.setObjectName("ProjectIndexerSidebar")
+        
+        # Create main widget
+        main_widget = QWidget()
+        layout = QVBoxLayout(main_widget)
+        
+        # Header
+        header = QLabel("Project Files")
+        header.setStyleSheet("font-weight: bold; font-size: 14px; padding: 5px;")
+        layout.addWidget(header)
+        
+        # Create file system model
+        self.file_model = QFileSystemModel()
+        self.file_model.setRootPath(QDir.homePath())
+        
+        # Set filters for geological file types
+        self.file_model.setNameFilters(["*.csv", "*.xlsx", "*.las", "*.txt"])
+        self.file_model.setNameFilterDisables(False)
+        
+        # Create tree view
+        self.tree_view = QTreeView()
+        self.tree_view.setModel(self.file_model)
+        self.tree_view.setRootIndex(self.file_model.index(QDir.homePath()))
+        
+        # Configure tree view
+        self.tree_view.setAnimated(True)
+        self.tree_view.setIndentation(20)
+        self.tree_view.setSortingEnabled(True)
+        
+        # Hide unnecessary columns
+        self.tree_view.hideColumn(1)  # Size
+        self.tree_view.hideColumn(2)  # Type
+        self.tree_view.hideColumn(3)  # Date Modified
+        
+        # Set column width
+        self.tree_view.setColumnWidth(0, 250)
+        
+        # Connect double-click signal
+        self.tree_view.doubleClicked.connect(self.on_file_double_clicked)
+        
+        layout.addWidget(self.tree_view)
+        
+        # Status label
+        self.status_label = QLabel(f"Browsing: {QDir.homePath()}")
+        self.status_label.setStyleSheet("color: #666; font-size: 11px; padding: 3px;")
+        layout.addWidget(self.status_label)
+        
+        self.setWidget(main_widget)
+        
+        # Set dock widget properties
+        self.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea)
+        self.setFeatures(QDockWidget.DockWidgetFeature.DockWidgetMovable | 
+                        QDockWidget.DockWidgetFeature.DockWidgetFloatable)
+    
+    
+    def on_file_double_clicked(self, index):
+        """Handle file double-click in sidebar"""
+        if index.isValid():
+            file_path = self.file_model.filePath(index)
+            if os.path.isfile(file_path) and file_path.lower().endswith(('.csv', '.xlsx', '.las')):
+                # Call parent method to open file
+                if self.parent():
+                    self.parent().open_hole_with_path(file_path)
+    def set_root_path(self, path):
+        """Set the root path for the file browser"""
+        if os.path.exists(path):
+            self.tree_view.setRootIndex(self.file_model.index(path))
+            self.status_label.setText(f"Browsing: {os.path.basename(path)}")
+    
+    def get_selected_file(self):
+        """Get the currently selected file path"""
+        index = self.tree_view.currentIndex()
+        if index.isValid():
+            return self.file_model.filePath(index)
+        return None
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -112,6 +227,67 @@ class MainWindow(QMainWindow):
         # Load window geometry from settings or use defaults
         self.load_window_geometry()
         self.las_file_path = None
+        
+        # Create menu bar
+        self.create_menus()
+    
+    def create_menus(self):
+        """Create menu bar with MDI Window menu"""
+        menubar = self.menuBar()
+        
+        # File menu
+        file_menu = menubar.addMenu("&File")
+        
+        new_action = QAction("&New Hole", self)
+        new_action.triggered.connect(self.new_hole)
+        file_menu.addAction(new_action)
+        
+        open_action = QAction("&Open Hole", self)
+        open_action.triggered.connect(self.open_hole)
+        file_menu.addAction(open_action)
+        
+        file_menu.addSeparator()
+        
+        exit_action = QAction("E&xit", self)
+        exit_action.triggered.connect(self.close)
+        file_menu.addAction(exit_action)
+        
+        # Edit menu (placeholder)
+        edit_menu = menubar.addMenu("&Edit")
+        # TODO: Add edit actions
+        
+        # View menu (placeholder)
+        view_menu = menubar.addMenu("&View")
+        # TODO: Add view actions
+        
+        # Window menu (MDI specific)
+        self.window_menu = menubar.addMenu("&Window")
+        
+        tile_action = QAction("&Tile", self)
+        tile_action.triggered.connect(self.mdi_area.tileSubWindows)
+        self.window_menu.addAction(tile_action)
+        
+        cascade_action = QAction("&Cascade", self)
+        cascade_action.triggered.connect(self.mdi_area.cascadeSubWindows)
+        self.window_menu.addAction(cascade_action)
+        
+        self.window_menu.addSeparator()
+        
+        close_action = QAction("&Close Active", self)
+        close_action.triggered.connect(self.close_active_window)
+        self.window_menu.addAction(close_action)
+        
+        close_all_action = QAction("Close &All", self)
+        close_all_action.triggered.connect(self.close_all_windows)
+        self.window_menu.addAction(close_all_action)
+        
+        # Connect window updates
+        self.mdi_area.subWindowActivated.connect(self.update_window_menu)
+        
+        # Help menu (placeholder)
+        help_menu = menubar.addMenu("&Help")
+        # TODO: Add help actions
+
 
     def load_window_geometry(self):
         """Load window size and position from settings or set reasonable defaults based on screen size."""
@@ -198,8 +374,25 @@ class MainWindow(QMainWindow):
         self.gap_update_timer.setSingleShot(True)
         self.gap_update_timer.timeout.connect(self._perform_gap_visualization_update)
 
-        self.tab_widget = QTabWidget()
-        self.setCentralWidget(self.tab_widget)
+        self.mdi_area = QMdiArea()
+        self.mdi_area.setViewMode(QMdiArea.ViewMode.SubWindowView)
+        self.setCentralWidget(self.mdi_area)
+        
+        # Initialize window counter for new windows
+        self.window_counter = 1
+        
+        
+        # Create project indexer sidebar
+        self.project_sidebar = ProjectIndexerSidebar(self)
+        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.project_sidebar)
+        
+        # Set initial path to user's Documents folder
+        docs_path = os.path.expanduser("~/Documents")
+        if os.path.exists(docs_path):
+            self.project_sidebar.set_root_path(docs_path)
+        else:
+            self.project_sidebar.set_root_path(QDir.homePath())
+        
         self.control_panel_layout = QHBoxLayout()
         self.loadLasButton = QPushButton("Load LAS File")
         self.control_panel_layout.addWidget(self.loadLasButton)
@@ -2024,3 +2217,87 @@ class MainWindow(QMainWindow):
             print(f"Error updating gap visualization: {e}")
             import traceback
             traceback.print_exc()
+    
+    # ====== MDI METHODS ======
+    
+    def new_hole(self):
+        """Create a new drill hole editor window"""
+        sub_window = HoleEditorSubWindow(parent=self)
+        sub_window.setWindowTitle(f"Hole Editor {self.window_counter} - Untitled")
+        self.mdi_area.addSubWindow(sub_window)
+        sub_window.show()
+        self.window_counter += 1
+        self.update_window_menu()
+    
+    def open_hole(self):
+        """Open an existing drill hole file in new sub-window"""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Open Drill Hole File", "",
+            "CSV Files (*.csv);;Excel Files (*.xlsx);;LAS Files (*.las);;All Files (*.*)"
+        )
+        
+        if file_path:
+            sub_window = HoleEditorSubWindow(file_path, parent=self)
+            self.mdi_area.addSubWindow(sub_window)
+            sub_window.show()
+            self.update_window_menu()
+    
+    def close_active_window(self):
+        """Close the active sub-window"""
+        active = self.mdi_area.activeSubWindow()
+        if active:
+            active.close()
+    
+    def close_all_windows(self):
+        """Close all sub-windows"""
+        for window in self.mdi_area.subWindowList():
+            window.close()
+    
+    def update_window_menu(self):
+        """Update the Window menu with list of open windows"""
+        # Clear existing window list (skip permanent actions)
+        for action in self.window_menu.actions():
+            if action.text().startswith("&") and not action.text()[1:2].isdigit():
+                continue  # Keep permanent actions
+            self.window_menu.removeAction(action)
+        
+        # Add separator if there are windows
+        windows = self.mdi_area.subWindowList()
+        if windows:
+            self.window_menu.addSeparator()
+        
+        # Add each window to menu
+        for i, window in enumerate(windows):
+            action = QAction(f"&{i+1} {window.windowTitle()}", self)
+            action.triggered.connect(lambda checked, w=window: self.activate_window(w))
+            self.window_menu.addAction(action)
+    
+    
+    
+    def open_file_from_sidebar(self):
+        """Open the currently selected file from sidebar"""
+        file_path = self.project_sidebar.get_selected_file()
+        if file_path and os.path.isfile(file_path):
+            # Check if it's a supported file type
+            if file_path.lower().endswith(('.csv', '.xlsx', '.las')):
+                self.open_hole_with_path(file_path)
+            else:
+                QMessageBox.warning(self, "Unsupported File", 
+                                   f"Unsupported file type: {os.path.basename(file_path)}")
+    
+    def open_hole_with_path(self, file_path):
+        """Open a hole with specific file path (used by sidebar)"""
+        sub_window = HoleEditorSubWindow(file_path, parent=self)
+        self.mdi_area.addSubWindow(sub_window)
+        sub_window.show()
+        
+        # Load the file into the sub-window
+        sub_window.load_file(file_path)
+        
+        self.update_window_menu()
+def activate_window(self, window):
+        """Activate a specific window"""
+        window.setFocus()
+        window.showNormal()
+        window.raise_()
+    
