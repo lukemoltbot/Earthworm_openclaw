@@ -1,11 +1,28 @@
-from PyQt6.QtWidgets import (
-    QMainWindow, QVBoxLayout, QHBoxLayout, QWidget,
-    QPushButton, QComboBox, QLabel, QGraphicsView, QFileDialog, QMessageBox,
-    QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QColorDialog, QGraphicsScene, QDoubleSpinBox, QCheckBox, QSlider, QSpinBox, QFrame, QSplitter, QAbstractItemView, QMdiArea, QMdiSubWindow, QDockWidget, QTreeView)
-from PyQt6.QtGui import QPainter, QPixmap, QColor, QFont, QBrush
-from PyQt6.QtSvg import QSvgRenderer
-from PyQt6.QtSvgWidgets import QGraphicsSvgItem
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QObject, QPointF, QTimer, QFileSystemModel, QDir
+# PyQt version-agnostic imports
+try:
+    # Try PyQt6 first
+    from PyQt6.QtWidgets import (
+        QMainWindow, QVBoxLayout, QHBoxLayout, QWidget,
+        QPushButton, QComboBox, QLabel, QGraphicsView, QFileDialog, QMessageBox,
+        QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QColorDialog, QGraphicsScene, QDoubleSpinBox, QCheckBox, QSlider, QSpinBox, QFrame, QSplitter, QAbstractItemView, QMdiArea, QMdiSubWindow, QDockWidget, QTreeView, QAction)
+    from PyQt6.QtGui import QPainter, QPixmap, QColor, QFont, QBrush
+    from PyQt6.QtSvg import QSvgRenderer
+    from PyQt6.QtSvgWidgets import QGraphicsSvgItem
+    from PyQt6.QtCore import Qt, QThread, pyqtSignal, QObject, QPointF, QTimer, QDir
+    # QFileSystemModel is in QtCore in PyQt6
+    from PyQt6.QtCore import QFileSystemModel
+    PYQT_VERSION = 6
+except ImportError:
+    # Fall back to PyQt5
+    from PyQt5.QtWidgets import (
+        QMainWindow, QVBoxLayout, QHBoxLayout, QWidget,
+        QPushButton, QComboBox, QLabel, QGraphicsView, QFileDialog, QMessageBox,
+        QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QColorDialog, QGraphicsScene, QDoubleSpinBox, QCheckBox, QSlider, QSpinBox, QFrame, QSplitter, QAbstractItemView, QMdiArea, QMdiSubWindow, QDockWidget, QTreeView, QAction, QFileSystemModel)
+    from PyQt5.QtGui import QPainter, QPixmap, QColor, QFont, QBrush
+    from PyQt5.QtSvg import QSvgRenderer
+    from PyQt5.QtSvgWidgets import QGraphicsSvgItem
+    from PyQt5.QtCore import Qt, QThread, pyqtSignal, QObject, QPointF, QTimer, QDir
+    PYQT_VERSION = 5
 import pandas as pd
 import numpy as np
 import os
@@ -291,8 +308,14 @@ class MainWindow(QMainWindow):
 
     def load_window_geometry(self):
         """Load window size and position from settings or set reasonable defaults based on screen size."""
-        from PyQt6.QtGui import QGuiApplication
-        from PyQt6.QtCore import QRect
+        try:
+            from PyQt6.QtGui import QGuiApplication
+        except ImportError:
+            from PyQt5.QtGui import QGuiApplication
+        try:
+            from PyQt6.QtCore import QRect
+        except ImportError:
+            from PyQt5.QtCore import QRect
 
         # Get the primary screen
         screen = QGuiApplication.primaryScreen()
@@ -949,7 +972,10 @@ class MainWindow(QMainWindow):
 
     def save_window_geometry(self):
         """Save current window size and position to settings."""
-        from PyQt6.QtCore import QRect
+        try:
+            from PyQt6.QtCore import QRect
+        except ImportError:
+            from PyQt5.QtCore import QRect
 
         # Get current window geometry
         geometry = self.geometry()
@@ -1123,7 +1149,10 @@ class MainWindow(QMainWindow):
 
     def create_actions_widget(self, row):
         """Create a widget with edit/delete buttons for the Actions column."""
-        from PyQt6.QtWidgets import QWidget, QHBoxLayout, QPushButton
+        try:
+            from PyQt6.QtWidgets import QWidget, QHBoxLayout, QPushButton
+        except ImportError:
+            from PyQt5.QtWidgets import QWidget, QHBoxLayout, QPushButton
 
         actions_widget = QWidget()
         layout = QHBoxLayout(actions_widget)
