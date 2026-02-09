@@ -4,7 +4,7 @@ try:
     from PyQt6.QtWidgets import (
         QMainWindow, QVBoxLayout, QHBoxLayout, QWidget,
         QPushButton, QComboBox, QLabel, QGraphicsView, QFileDialog, QMessageBox,
-        QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QColorDialog, QGraphicsScene, QDoubleSpinBox, QCheckBox, QSlider, QSpinBox, QFrame, QSplitter, QAbstractItemView, QMdiArea, QMdiSubWindow, QDockWidget, QTreeView)
+        QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QColorDialog, QGraphicsScene, QDoubleSpinBox, QCheckBox, QSlider, QSpinBox, QFrame, QSplitter, QAbstractItemView, QMdiArea, QMdiSubWindow, QDockWidget, QTreeView, QFileSystemModel)
     # Import QAction separately to avoid Windows import issues
     try:
         from PyQt6.QtWidgets import QAction
@@ -15,10 +15,6 @@ try:
     from PyQt6.QtSvg import QSvgRenderer
     from PyQt6.QtSvgWidgets import QGraphicsSvgItem
     from PyQt6.QtCore import Qt, QThread, pyqtSignal, QObject, QPointF, QTimer, QDir
-    
-    # QFileSystemModel is in QtCore in PyQt6/Qt6
-    # If this fails, check PyQt6 installation
-    from PyQt6.QtCore import QFileSystemModel
         
     PYQT_VERSION = 6
 except ImportError as e:
@@ -26,7 +22,7 @@ except ImportError as e:
     from PyQt5.QtWidgets import (
         QMainWindow, QVBoxLayout, QHBoxLayout, QWidget,
         QPushButton, QComboBox, QLabel, QGraphicsView, QFileDialog, QMessageBox,
-        QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QColorDialog, QGraphicsScene, QDoubleSpinBox, QCheckBox, QSlider, QSpinBox, QFrame, QSplitter, QAbstractItemView, QMdiArea, QMdiSubWindow, QDockWidget, QTreeView)
+        QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QColorDialog, QGraphicsScene, QDoubleSpinBox, QCheckBox, QSlider, QSpinBox, QFrame, QSplitter, QAbstractItemView, QMdiArea, QMdiSubWindow, QDockWidget, QTreeView, QFileSystemModel)
     # Import QAction separately to avoid Windows import issues
     from PyQt5.QtWidgets import QAction
     from PyQt5.QtGui import QPainter, QPixmap, QColor, QFont, QBrush
