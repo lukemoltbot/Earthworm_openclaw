@@ -15,15 +15,15 @@ try:
     from PyQt6.QtSvg import QSvgRenderer
     from PyQt6.QtSvgWidgets import QGraphicsSvgItem
     from PyQt6.QtCore import Qt, QThread, pyqtSignal, QObject, QPointF, QTimer, QDir
-    # QFileSystemModel is in QtCore in PyQt6
-    from PyQt6.QtCore import QFileSystemModel
+    # QFileSystemModel is in QtWidgets in PyQt6 (not QtCore)
+    from PyQt6.QtWidgets import QFileSystemModel
     PYQT_VERSION = 6
 except ImportError:
     # Fall back to PyQt5
     from PyQt5.QtWidgets import (
         QMainWindow, QVBoxLayout, QHBoxLayout, QWidget,
         QPushButton, QComboBox, QLabel, QGraphicsView, QFileDialog, QMessageBox,
-        QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QColorDialog, QGraphicsScene, QDoubleSpinBox, QCheckBox, QSlider, QSpinBox, QFrame, QSplitter, QAbstractItemView, QMdiArea, QMdiSubWindow, QDockWidget, QTreeView,  QFileSystemModel)
+        QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QColorDialog, QGraphicsScene, QDoubleSpinBox, QCheckBox, QSlider, QSpinBox, QFrame, QSplitter, QAbstractItemView, QMdiArea, QMdiSubWindow, QDockWidget, QTreeView)
     # Import QAction separately to avoid Windows import issues
     from PyQt5.QtWidgets import QAction
     from PyQt5.QtGui import QPainter, QPixmap, QColor, QFont, QBrush
