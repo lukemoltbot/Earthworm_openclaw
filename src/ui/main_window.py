@@ -54,6 +54,7 @@ from .widgets.multi_attribute_widget import MultiAttributeWidget
 from .widgets.enhanced_pattern_preview import EnhancedPatternPreview
 from .widgets.lithology_table import LithologyTableWidget
 from .widgets.coallog_table_widget import CoalLogTableWidget
+from .dialogs.tabbed_settings_dialog import TabbedSettingsDialog
 
 class SvgPreviewWidget(QGraphicsView):
     def __init__(self, parent=None):
@@ -279,9 +280,16 @@ class MainWindow(QMainWindow):
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
         
-        # Edit menu (placeholder)
+        # Edit menu
         edit_menu = menubar.addMenu("&Edit")
-        # TODO: Add edit actions
+        
+        # Settings action
+        settings_action = QAction("&Settings...", self)
+        settings_action.triggered.connect(self.show_settings_dialog)
+        edit_menu.addAction(settings_action)
+        
+        edit_menu.addSeparator()
+        # TODO: Add other edit actions
         
         # View menu (placeholder)
         view_menu = menubar.addMenu("&View")
@@ -2367,9 +2375,15 @@ class MainWindow(QMainWindow):
         sub_window.load_file(file_path)
         
         self.update_window_menu()
-def activate_window(self, window):
+        
+    def activate_window(self, window):
         """Activate a specific window"""
         window.setFocus()
         window.showNormal()
         window.raise_()
+    
+    def show_settings_dialog(self):
+        """Show the tabbed settings dialog"""
+        dialog = TabbedSettingsDialog(parent=self)
+        dialog.exec()
     
