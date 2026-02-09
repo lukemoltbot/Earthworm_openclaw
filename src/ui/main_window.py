@@ -15,10 +15,13 @@ try:
     from PyQt6.QtSvg import QSvgRenderer
     from PyQt6.QtSvgWidgets import QGraphicsSvgItem
     from PyQt6.QtCore import Qt, QThread, pyqtSignal, QObject, QPointF, QTimer, QDir
-    # QFileSystemModel is in QtWidgets in PyQt6 (not QtCore)
-    from PyQt6.QtWidgets import QFileSystemModel
+    
+    # QFileSystemModel is in QtCore in PyQt6/Qt6
+    # If this fails, check PyQt6 installation
+    from PyQt6.QtCore import QFileSystemModel
+        
     PYQT_VERSION = 6
-except ImportError:
+except ImportError as e:
     # Fall back to PyQt5
     from PyQt5.QtWidgets import (
         QMainWindow, QVBoxLayout, QHBoxLayout, QWidget,
