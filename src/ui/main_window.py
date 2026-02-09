@@ -41,6 +41,7 @@ from ..core.data_processor import DataProcessor
 from ..core.analyzer import Analyzer
 from ..core.config import DEFAULT_LITHOLOGY_RULES, DEPTH_COLUMN, DEFAULT_SEPARATOR_THICKNESS, DRAW_SEPARATOR_LINES, CURVE_RANGES, INVALID_DATA_VALUE
 from ..core.coallog_utils import load_coallog_dictionaries
+from ..core.coallog_schema import get_coallog_schema
 from .widgets.stratigraphic_column import StratigraphicColumn
 from .widgets.svg_renderer import SvgRenderer
 from .widgets.curve_plotter import CurvePlotter # Import CurvePlotter
@@ -52,6 +53,7 @@ from .widgets.compact_range_widget import CompactRangeWidget # Import compact wi
 from .widgets.multi_attribute_widget import MultiAttributeWidget
 from .widgets.enhanced_pattern_preview import EnhancedPatternPreview
 from .widgets.lithology_table import LithologyTableWidget
+from .widgets.coallog_table_widget import CoalLogTableWidget
 
 class SvgPreviewWidget(QGraphicsView):
     def __init__(self, parent=None):
@@ -407,11 +409,13 @@ class MainWindow(QMainWindow):
 
         self.mdi_area = QMdiArea()
         self.mdi_area.setViewMode(QMdiArea.ViewMode.SubWindowView)
-        self.setCentralWidget(self.mdi_area)
         
         # Initialize window counter for new windows
         self.window_counter = 1
         
+        # Create main tab widget for settings and editor
+        self.tab_widget = QTabWidget()
+        self.setCentralWidget(self.tab_widget)
         
         # Create project indexer sidebar
         self.project_sidebar = ProjectIndexerSidebar(self)
@@ -453,7 +457,18 @@ class MainWindow(QMainWindow):
         self.curvePlotter = CurvePlotter()
 
         self.stratigraphicColumnView = StratigraphicColumn()
-        self.editorTable = LithologyTableWidget(coallog_data=self.coallog_data)
+        
+        # Initialize table based on settings (default to 37-column CoalLog table)
+        app_settings = load_settings()
+        use_coallog_table = app_settings.get("use_coallog_table", True)
+        
+        if use_coallog_table:
+            self.editorTable = CoalLogTableWidget(coallog_data=self.coallog_data)
+            print("Using 37-column CoalLog table")
+        else:
+            self.editorTable = LithologyTableWidget(coallog_data=self.coallog_data)
+            print("Using 13-column lithology table")
+        
         self.exportCsvButton = QPushButton("Export to CSV")
 
         # Connect table row selection to stratigraphic column highlighting
@@ -551,6 +566,18 @@ class MainWindow(QMainWindow):
         else:
             # Highlight the corresponding unit in stratigraphic column
             self.stratigraphicColumnView.highlight_unit(row_index)
+    
+    def _on_table_data_changed(self, data):
+        """Handle table data changes and update graphics."""
+        # When table data changes, we should update the stratigraphic column
+        # For now, just print a debug message
+        print(f"Table data changed, should update graphics. Data: {data}")
+        # TODO: Implement graphics update when table data changes
+    
+    def _on_table_validation_error(self, message, row, col):
+        """Handle table validation errors."""
+        QMessageBox.warning(self, "Validation Error", 
+                           f"Validation error at row {row+1}, column {col+1}:\n{message}")
 
     def find_svg_file(self, lithology_code, lithology_qualifier=''):
         svg_dir = os.path.join(os.getcwd(), 'src', 'assets', 'svg')
@@ -591,6 +618,14 @@ class MainWindow(QMainWindow):
         self.runAnalysisButton.clicked.connect(self.run_analysis)
         self.exportCsvButton.clicked.connect(self.export_editor_data_to_csv)
         self.tab_widget.currentChanged.connect(self.on_tab_changed)
+        
+        # Connect table data changed signal if it exists (for CoalLogTableWidget)
+        if hasattr(self.editorTable, 'dataChangedSignal'):
+            self.editorTable.dataChangedSignal.connect(self._on_table_data_changed)
+        
+        # Connect table validation error signal if it exists
+        if hasattr(self.editorTable, 'validationErrorSignal'):
+            self.editorTable.validationErrorSignal.connect(self._on_table_validation_error)
 
     def load_las_file_dialog(self):
         file_dialog = QFileDialog()

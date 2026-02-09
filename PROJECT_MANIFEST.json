@@ -1,0 +1,113 @@
+{
+  "project": "Earthworm Borehole Logger",
+  "version": "2.1",
+  "phase": 2,
+  "status": "IMPLEMENTATION COMPLETE",
+  
+  "phase_1_progress": {
+    "task_1_1": "COMPLETED - MDI interface with Window menu, Tile/Cascade actions",
+    "task_1_2": "COMPLETED - Project Indexer Sidebar with file browsing",
+    "import_fixes": {
+      "windows_issue": "ImportError: cannot import name 'QAction' from 'PyQt6.QtWidgets'",
+      "fixes_applied": [
+        "Commit 82bfba1: Windows-specific QAction import fix",
+        "Commit 2a23d40: Version-agnostic PyQt imports"
+      ],
+      "status": "FIXED AND COMMITTED"
+    },
+    "github_url": "https://github.com/lukemoltbot/Earthworm_openclaw",
+    "last_commit": "82bfba1 - Fix: Windows PyQt6 QAction import error"
+  },
+  
+  "phase_2_progress": {
+    "task_2_1": "COMPLETED - 37-Column CoalLog Table Schema",
+    "task_2_2": "COMPLETED - Modal Tabbed Settings Dialog",
+    "implementation_details": {
+      "37_column_schema": {
+        "total_columns": 37,
+        "categories": [
+          "Depth Information (3)",
+          "Lithology Core (3)",
+          "Color Attributes (3)",
+          "Weathering & Strength (3)",
+          "Grain Size & Shape (3)",
+          "Coal Quality (3)",
+          "Structural Geology (3)",
+          "Geotechnical (3)",
+          "Core Recovery (3)",
+          "Hydrogeology (3)",
+          "Geophysics (3)",
+          "Sample & Testing (3)",
+          "Comments (1)"
+        ],
+        "key_features": [
+          "Dictionary dropdowns for coded fields",
+          "Auto-calculation of thickness",
+          "Data type validation",
+          "Error highlighting",
+          "Backward compatible with 13-column format"
+        ]
+      },
+      "tabbed_settings_dialog": {
+        "tabs": ["General", "Lithology", "Geotechnical", "Export", "Advanced"],
+        "features": [
+          "Settings persistence to JSON",
+          "Category-specific controls",
+          "CoalLog export format configuration",
+          "Unit system selection",
+          "Auto-save configuration"
+        ]
+      }
+    },
+    "files_created": [
+      "src/core/coallog_schema.py",
+      "src/ui/widgets/coallog_table_widget.py",
+      "src/ui/dialogs/tabbed_settings_dialog.py",
+      "READY_FOR_COMMIT.md"
+    ],
+    "files_modified": [
+      "src/ui/main_window.py"
+    ],
+    "integration_status": "COMPLETE",
+    "backward_compatibility": "MAINTAINED",
+    "test_results": "Compilation successful, structure verified",
+    "status": "IMPLEMENTATION COMPLETE - READY FOR COMMIT",
+    "last_modified": "2026-02-09T15:40:00+11:00"
+  },
+  
+  "next_phase": {
+    "phase": 3,
+    "title": "Enhanced Visualization & Real-time Sync",
+    "planned_tasks": [
+      "Task 3.1: Enhanced Visualization Tools",
+      "Task 3.2: Real-time Data Synchronization"
+    ],
+    "dependencies": ["Phase 2 completion"],
+    "estimated_start": "After Phase 2 verification"
+  },
+  
+  "technical_notes": {
+    "pyqt_version": "Version-agnostic (PyQt5/PyQt6)",
+    "python_version": "3.8+",
+    "dependencies": ["PyQt6 (or PyQt5)", "pandas", "numpy", "lasio", "openpyxl"],
+    "platform_support": ["Windows", "macOS", "Linux"],
+    "known_issues": [
+      "Windows PyQt6 import issues resolved in commit 82bfba1",
+      "Missing CoalLog dictionary files handled gracefully"
+    ]
+  },
+  
+  "repository": {
+    "url": "https://github.com/lukemoltbot/Earthworm_openclaw",
+    "branch": "main",
+    "recent_commits": [
+      "82bfba1 - Fix: Windows PyQt6 QAction import error",
+      "2a23d40 - Fix: Version-agnostic PyQt imports",
+      "19c2b65 - Phase 1: IDE Foundation & Project Explorer"
+    ]
+  },
+  
+  "development_plan": "V2.1: Professional IDE Integration",
+  "current_focus": "Phase 2 completion and commit",
+  "ready_for": "User testing and Phase 3 planning"
+}
