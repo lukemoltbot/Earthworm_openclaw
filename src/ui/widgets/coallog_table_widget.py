@@ -9,8 +9,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QBrush
 
-from ..core.coallog_schema import get_coallog_schema, get_dictionary_columns
-from ..core.coallog_utils import load_coallog_dictionaries
+from ...core.coallog_schema import get_coallog_schema, get_dictionary_columns
+from ...core.coallog_utils import load_coallog_dictionaries
 
 class CoalLogDictionaryDelegate(QStyledItemDelegate):
     """
