@@ -94,6 +94,7 @@ class CoalLogTableWidget(QTableWidget):
     
     dataChangedSignal = pyqtSignal(object)  # Signal to notify main window to redraw graphics
     validationErrorSignal = pyqtSignal(str, int, int)  # Signal for validation errors (message, row, col)
+    rowSelectionChangedSignal = pyqtSignal(int)  # Signal emitted when row selection changes (passes row index or -1 if none)
     
     def __init__(self, coallog_data=None, parent=None):
         super().__init__(parent)
@@ -121,6 +122,7 @@ class CoalLogTableWidget(QTableWidget):
         
         # Connect signals
         self.itemChanged.connect(self._handle_item_changed)
+        self.itemSelectionChanged.connect(self._handle_selection_changed)
         
         # Track validation errors
         self.validation_errors = {}
@@ -227,6 +229,17 @@ class CoalLogTableWidget(QTableWidget):
         
         # Emit data changed signal
         self.dataChangedSignal.emit(None)
+    
+    def _handle_selection_changed(self):
+        """Handle row selection changes and emit signal"""
+        selected_items = self.selectedItems()
+        if selected_items:
+            # Get the first selected row
+            selected_row_index = selected_items[0].row()
+            self.rowSelectionChangedSignal.emit(selected_row_index)
+        else:
+            # No selection
+            self.rowSelectionChangedSignal.emit(-1)
     
     def _calculate_thickness(self, row):
         """Calculate thickness from FROM and TO values"""
