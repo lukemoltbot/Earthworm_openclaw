@@ -1,14 +1,6 @@
 import sys
 import logging
-
-# PyQt version-agnostic imports (matching main_window.py)
-try:
-    from PyQt6.QtWidgets import QApplication
-    PYQT_VERSION = 6
-except ImportError:
-    from PyQt5.QtWidgets import QApplication
-    PYQT_VERSION = 5
-
+from PyQt6.QtWidgets import QApplication
 from src.ui.main_window import MainWindow
 
 if __name__ == "__main__":

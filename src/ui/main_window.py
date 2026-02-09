@@ -1,40 +1,26 @@
-# PyQt version-agnostic imports
-try:
-    # Try PyQt6 first
-    from PyQt6.QtWidgets import (
-        QMainWindow, QVBoxLayout, QHBoxLayout, QWidget,
-        QPushButton, QComboBox, QLabel, QGraphicsView, QFileDialog, QMessageBox,
-        QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QColorDialog, QGraphicsScene, QDoubleSpinBox, QCheckBox, QSlider, QSpinBox, QFrame, QSplitter, QAbstractItemView, QMdiArea, QMdiSubWindow, QDockWidget, QTreeView, QFileSystemModel)
-    # Import QAction separately to avoid Windows import issues
-    try:
-        from PyQt6.QtWidgets import QAction
-    except ImportError:
-        # Some PyQt6 installations have QAction in QtGui
-        from PyQt6.QtGui import QAction
-    from PyQt6.QtGui import QPainter, QPixmap, QColor, QFont, QBrush
-    from PyQt6.QtSvg import QSvgRenderer
-    from PyQt6.QtSvgWidgets import QGraphicsSvgItem
-    from PyQt6.QtCore import Qt, QThread, pyqtSignal, QObject, QPointF, QTimer, QDir
-        
-    PYQT_VERSION = 6
-except ImportError as e:
-    # Fall back to PyQt5
-    from PyQt5.QtWidgets import (
-        QMainWindow, QVBoxLayout, QHBoxLayout, QWidget,
-        QPushButton, QComboBox, QLabel, QGraphicsView, QFileDialog, QMessageBox,
-        QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QColorDialog, QGraphicsScene, QDoubleSpinBox, QCheckBox, QSlider, QSpinBox, QFrame, QSplitter, QAbstractItemView, QMdiArea, QMdiSubWindow, QDockWidget, QTreeView, QFileSystemModel)
-    # Import QAction separately to avoid Windows import issues
-    from PyQt5.QtWidgets import QAction
-    from PyQt5.QtGui import QPainter, QPixmap, QColor, QFont, QBrush
-    from PyQt5.QtSvg import QSvgRenderer
-    from PyQt5.QtSvgWidgets import QGraphicsSvgItem
-    from PyQt5.QtCore import Qt, QThread, pyqtSignal, QObject, QPointF, QTimer, QDir
-    PYQT_VERSION = 5
-import pandas as pd
-import numpy as np
 import os
 import json
 import traceback
+import pandas as pd
+import numpy as np
+
+# Pure PyQt6 Imports (No Fallback)
+from PyQt6.QtWidgets import (
+    QMainWindow, QVBoxLayout, QHBoxLayout, QWidget,
+    QPushButton, QComboBox, QLabel, QGraphicsView, QFileDialog, QMessageBox,
+    QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QColorDialog, 
+    QGraphicsScene, QDoubleSpinBox, QCheckBox, QSlider, QSpinBox, QFrame, 
+    QSplitter, QAbstractItemView, QMdiArea, QMdiSubWindow, QDockWidget, QTreeView
+)
+from PyQt6.QtGui import (
+    QPainter, QPixmap, QColor, QFont, QBrush, QAction, QFileSystemModel
+)
+from PyQt6.QtSvg import QSvgRenderer
+from PyQt6.QtSvgWidgets import QGraphicsSvgItem
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QObject, QPointF, QTimer, QDir
+
+# Set version flag for any downstream logic
+PYQT_VERSION = 6
 
 from ..core.data_processor import DataProcessor
 from ..core.analyzer import Analyzer
